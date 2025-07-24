@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>健康记录</title>
+    
+    <!-- PWA配置 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="健康记录">
+    <meta name="theme-color" content="#007AFF">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #f2f2f7;
+            color: #000;
+            padding-bottom: 80px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #007AFF, #5856D6);
+            color: white;
+            padding: 20px 16px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 4px;
+        }
+        
+        .auto-save-indicator {
+            position: absolute;
+            top: 20px;
+            right: 16px;
+            background: rgba(255,255,255,0.2);
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .auto-save-indicator.show {
+            opacity: 1;
+        }
+        
+        .date-selector {
+            background: white;
+            margin: 16px;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .date-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        
+        .section {
+            background: white;
+            margin: 16px;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #007AFF;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .section-title::before {
+            content: attr(data-icon);
+            margin-right: 8px;
+            font-size: 20px;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        
+        .btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            width: 100%;
+            margin: 8px 0;
+        }
+        
+        .btn:active {
+            transform: scale(0.98);
+            background: #0056b3;
+        }
+        
+        .btn-success {
+            background: #28a745;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+        }
+        
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 14px;
+            width: auto;
+            display: inline-block;
+            margin: 4px;
+        }
+        
+        .record-item {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 8px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .record-info {
+            flex: 1;
+        }
+        
+        .record-time {
+            font-weight: 600;
+            color: #007AFF;
+        }
+        
+        .record-details {
+            font-size: 14px;
+            color: #666;
+            margin-top: 4px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 16px;
+        }
+        
+        .stat-card {
+            background: #f0f9ff;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007AFF;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+        
+        .checkbox-list {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+        
+        .checkbox-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .checkbox-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+        }
+        
+        .range-group {
+            margin-bottom: 16px;
+        }
+        
+        .range-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 8px;
+        }
+        
+        .range-input {
+            flex: 1;
+        }
+        
+        .range-value {
+            font-weight: bold;
+            font-size: 18px;
+            color: #007AFF;
+            min-width: 30px;
+            text-align: center;
+        }
+        
+        .bottom-tabs {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            height: 80px;
+            z-index: 100;
+        }
+        
+        .tab-button {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: none;
+            border: none;
+            font-size: 12px;
+            color: #8e8e93;
+            cursor: pointer;
+        }
+        
+        .tab-button.active {
+            color: #007AFF;
+        }
+        
+        .tab-icon {
+            font-size: 24px;
+            margin-bottom: 4px;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .quick-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #8e8e93;
+        }
+        
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        
+        .toast {
+            position: fixed;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .toast.show {
+            opacity: 1;
+        }
+        
+        .history-item {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        
+        .history-date {
+            font-weight: 600;
+            color: #007AFF;
+            margin-bottom: 8px;
+        }
+        
+        .history-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+            gap: 8px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏥 健康记录</h1>
+        <p>数据自动保存到本地</p>
+        <div id="autoSaveIndicator" class="auto-save-indicator">已保存</div>
+    </div>
+
+    <!-- 记录标签页 -->
+    <div id="record" class="tab-content active">
+        <div class="date-selector">
+            <label>记录日期</label>
+            <input type="date" id="recordDate" class="date-input" onchange="updateDate()">
+        </div>
+
+        <!-- 快捷操作 -->
+        <div class="section">
+            <div class="section-title" data-icon="⚡">快捷记录</div>
+            <div class="quick-actions">
+                <button class="btn btn-success" onclick="addBathroomRecord('urine')">💧 小便</button>
+                <button class="btn btn-success" onclick="addBathroomRecord('stool')">💩 大便</button>
+            </div>
+        </div>
+
+        <!-- 生命体征 -->
+        <div class="section">
+            <div class="section-title" data-icon="❤️">生命体征</div>
+            <div class="form-group">
+                <label>测量时间</label>
+                <input type="time" id="vitalTime" class="form-input">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>高压</label>
+                    <input type="number" id="bloodPressureHigh" class="form-input" placeholder="120">
+                </div>
+                <div class="form-group">
+                    <label>低压</label>
+                    <input type="number" id="bloodPressureLow" class="form-input" placeholder="80">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>心率</label>
+                    <input type="number" id="heartRate" class="form-input" placeholder="次/分">
+                </div>
+                <div class="form-group">
+                    <label>血氧</label>
+                    <input type="number" id="oxygenSaturation" class="form-input" placeholder="%">
+                </div>
+            </div>
+            <button class="btn" onclick="addVitalRecord()">➕ 添加记录</button>
+            <div id="vitalRecords"></div>
+        </div>
+
+        <!-- 用药记录 -->
+        <div class="section">
+            <div class="section-title" data-icon="💊">用药记录</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>时间</label>
+                    <input type="time" id="medicationTime" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>药名</label>
+                    <input type="text" id="medicationName" class="form-input" placeholder="药品名称">
+                </div>
+            </div>
+            <button class="btn" onclick="addMedicationRecord()">➕ 添加用药</button>
+            <div id="medicationRecords"></div>
+        </div>
+
+        <!-- 浮肿记录 -->
+        <div class="section">
+            <div class="section-title" data-icon="🦶">浮肿程度</div>
+            <div class="range-group">
+                <label>左脚浮肿 (0-10)</label>
+                <div class="range-container">
+                    <input type="range" id="leftSwelling" class="range-input" min="0" max="10" value="0" oninput="updateSwelling('left', this.value)">
+                    <div class="range-value" id="leftSwellingValue">0</div>
+                </div>
+            </div>
+            <div class="range-group">
+                <label>右脚浮肿 (0-10)</label>
+                <div class="range-container">
+                    <input type="range" id="rightSwelling" class="range-input" min="0" max="10" value="0" oninput="updateSwelling('right', this.value)">
+                    <div class="range-value" id="rightSwellingValue">0</div>
+                </div>
+            </div>
+            <button class="btn" onclick="saveSwellingRecord()">💾 保存记录</button>
+        </div>
+
+        <!-- 日常事项 -->
+        <div class="section">
+            <div class="section-title" data-icon="📋">日常事项</div>
+            <div class="checkbox-list">
+                <div class="checkbox-item">
+                    <label>洗澡</label>
+                    <input type="checkbox" id="shower" onchange="saveDailyItems()">
+                </div>
+                <div class="checkbox-item">
+                    <label>洗头</label>
+                    <input type="checkbox" id="shampoo" onchange="saveDailyItems()">
+                </div>
+                <div class="checkbox-item">
+                    <label>停药</label>
+                    <input type="checkbox" id="stopMedication" onchange="saveDailyItems()">
+                </div>
+                <div class="checkbox-item">
+                    <label>精神良好</label>
+                    <input type="checkbox" id="goodMood" onchange="saveDailyItems()">
+                </div>
+                <div class="checkbox-item">
+                    <label>食欲正常</label>
+                    <input type="checkbox" id="goodAppetite" onchange="saveDailyItems()">
+                </div>
+                <div class="checkbox-item">
+                    <label>睡眠良好</label>
+                    <input type="checkbox" id="goodSleep" onchange="saveDailyItems()">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>停药详情</label>
+                <input type="text" id="stopMedicationDetail" class="form-input" placeholder="停用了什么药物" onchange="saveDailyItems()">
+            </div>
+            <div class="form-group">
+                <label>其他备注</label>
+                <textarea id="otherNotes" class="form-input" placeholder="其他重要事项..." rows="3" onchange="saveDailyItems()"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- 统计标签页 -->
+    <div id="stats" class="tab-content">
+        <div class="section">
+            <div class="section-title" data-icon="📊">今日统计</div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="urineCount">0</div>
+                    <div class="stat-label">小便次数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="stoolCount">0</div>
+                    <div class="stat-label">大便次数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="vitalCount">0</div>
+                    <div class="stat-label">体征测量</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="medicationCount">0</div>
+                    <div class="stat-label">用药次数</div>
+                </div>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="bloodPressureMax">--/--</div>
+                    <div class="stat-label">血压最高</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="heartRateMax">--</div>
+                    <div class="stat-label">心率最高</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="swellingLevel">0/0</div>
+                    <div class="stat-label">浮肿程度</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="dailyScore">--</div>
+                    <div class="stat-label">日常评分</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title" data-icon="📈">7日趋势</div>
+            <div id="weeklyStats"></div>
+        </div>
+    </div>
+
+    <!-- 历史标签页 -->
+    <div id="history" class="tab-content">
+        <div class="section">
+            <div class="section-title" data-icon="📚">历史记录</div>
+            <div id="historyList"></div>
+        </div>
+    </div>
+
+    <!-- 设置标签页 -->
+    <div id="settings" class="tab-content">
+        <div class="section">
+            <div class="section-title" data-icon="⚙️">数据管理</div>
+            <button class="btn btn-success" onclick="exportData()">📤 导出数据</button>
+            <button class="btn" onclick="document.getElementById('importFile').click()">📥 导入数据</button>
+            <button class="btn btn-danger" onclick="clearAllData()">🗑️ 清空数据</button>
+            <input type="file" id="importFile" style="display: none;" accept=".json" onchange="importData(event)">
+            
+            <div style="margin-top: 20px; padding: 16px; background: #f8f9fa; border-radius: 8px;">
+                <h4>📊 数据统计</h4>
+                <p id="dataStats" style="margin-top: 8px; color: #666;">计算中...</p>
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-title" data-icon="📋">使用说明</div>
+            <div style="line-height: 1.6; color: #666;">
+                <p><strong>📝 记录页面：</strong></p>
+                <p>• 选择日期后添加各项健康数据</p>
+                <p>• 数据会自动保存，无需手动保存</p>
+                <br>
+                <p><strong>📊 统计页面：</strong></p>
+                <p>• 查看当日和近期数据统计</p>
+                <p>• 显示关键指标的最大值和平均值</p>
+                <br>
+                <p><strong>📚 历史页面：</strong></p>
+                <p>• 回顾以往所有记录数据</p>
+                <p>• 方便对比不同日期的健康状况</p>
+                <br>
+                <p><strong>💾 数据安全：</strong></p>
+                <p>• 数据安全存储在手机本地</p>
+                <p>• 建议定期导出数据进行备份</p>
+                <p>• 可通过导入功能恢复备份数据</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部导航 -->
+    <div class="bottom-tabs">
+        <button class="tab-button active" onclick="switchTab('record')">
+            <div class="tab-icon">📝</div>
+            <div>记录</div>
+        </button>
+        <button class="tab-button" onclick="switchTab('stats')">
+            <div class="tab-icon">📊</div>
+            <div>统计</div>
+        </button>
+        <button class="tab-button" onclick="switchTab('history')">
+            <div class="tab-icon">📚</div>
+            <div>历史</div>
+        </button>
+        <button class="tab-button" onclick="switchTab('settings')">
+            <div class="tab-icon">⚙️</div>
+            <div>设置</div>
+        </button>
+    </div>
+
+    <!-- Toast消息 -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+        // 数据存储
+        let healthData = JSON.parse(localStorage.getItem('healthData') || '{}');
+        
+        // 显示自动保存指示器
+        function showAutoSaveIndicator() {
+            const indicator = document.getElementById('autoSaveIndicator');
+            indicator.classList.add('show');
+            setTimeout(() => indicator.classList.remove('show'), 1500);
+        }
+        
+        // 显示提示消息
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+        
+        // 标签页切换 - 修复函数定义
+        function switchTab(tabName) {
+            // 隐藏所有标签页内容
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('active');
+            });
+            
+            // 显示选中的标签页
+            document.getElementById(tabName).classList.add('active');
+            event.target.closest('.tab-button').classList.add('active');
+            
+            // 更新对应页面的数据
+            if (tabName === 'stats') updateStats();
+            if (tabName === 'history') updateHistory();
+            if (tabName === 'settings') updateDataStats();
+        }
+        
+        // 初始化
+        function init() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('recordDate').value = today;
+            document.getElementById('vitalTime').value = new Date().toTimeString().slice(0, 5);
+            document.getElementById('medicationTime').value = new Date().toTimeString().slice(0, 5);
+            updateDate();
+        }
+        
+        // 更新日期
+        function updateDate() {
+            const selectedDate = document.getElementById('recordDate').value;
+            loadDayData(selectedDate);
+        }
+        
+        // 加载当天数据
+        function loadDayData(date) {
+            const dayData = healthData[date] || {
+                vitals: [], bathroom: [], medications: [],
+                swelling: { left: 0, right: 0 }, dailyItems: {}, notes: ''
+            };
+            
+            displayRecords(dayData);
+            loadDailyItems(dayData.dailyItems || {});
+            document.getElementById('stopMedicationDetail').value = dayData.stopMedicationDetail || '';
+            document.getElementById('otherNotes').value = dayData.notes || '';
+            
+            document.getElementById('leftSwelling').value = dayData.swelling.left || 0;
+            document.getElementById('rightSwelling').value = dayData.swelling.right || 0;
+            updateSwelling('left', dayData.swelling.left || 0);
+            updateSwelling('right', dayData.swelling.right || 0);
+            
+            updateStats();
+        }
+        
+        // 显示记录
+        function displayRecords(dayData) {
+            // 生命体征记录
+            const vitalContainer = document.getElementById('vitalRecords');
+            if (dayData.vitals.length === 0) {
+                vitalContainer.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📊</div><p>暂无生命体征记录</p></div>';
+            } else {
+                vitalContainer.innerHTML = dayData.vitals.map(record => `
+                    <div class="record-item">
+                        <div class="record-info">
+                            <div class="record-time">${record.time}</div>
+                            <div class="record-details">
+                                血压: ${record.bloodPressureHigh}/${record.bloodPressureLow} | 
+                                心率: ${record.heartRate} | 血氧: ${record.oxygenSaturation}%
+                            </div>
+                        </div>
+                        <button class="btn btn-danger btn-small" onclick="deleteRecord('vitals', ${record.id})">删除</button>
+                    </div>
+                `).join('');
+            }
+            
+            // 用药记录
+            const medContainer = document.getElementById('medicationRecords');
+            if (dayData.medications.length === 0) {
+                medContainer.innerHTML = '<div class="empty-state"><div class="empty-state-icon">💊</div><p>暂无用药记录</p></div>';
+            } else {
+                medContainer.innerHTML = dayData.medications.map(record => `
+                    <div class="record-item">
+                        <div class="record-info">
+                            <div class="record-time">${record.time}</div>
+                            <div class="record-details">💊 ${record.name}</div>
+                        </div>
+                        <button class="btn btn-danger btn-small" onclick="deleteRecord('medications', ${record.id})">删除</button>
+                    </div>
+                `).join('');
+            }
+        }
+        
+        // 加载日常事项
+        function loadDailyItems(items) {
+            ['shower', 'shampoo', 'stopMedication', 'goodMood', 'goodAppetite', 'goodSleep'].forEach(id => {
+                const checkbox = document.getElementById(id);
+                if (checkbox) checkbox.checked = items[id] || false;
+            });
+        }
+        
+        // 保存日常事项
+        function saveDailyItems() {
+            const date = document.getElementById('recordDate').value;
+            if (!healthData[date]) healthData[date] = {
+                vitals: [], bathroom: [], medications: [],
+                swelling: { left: 0, right: 0 }, dailyItems: {}
+            };
+            
+            ['shower', 'shampoo', 'stopMedication', 'goodMood', 'goodAppetite', 'goodSleep'].forEach(id => {
+                const checkbox = document.getElementById(id);
+                if (checkbox) healthData[date].dailyItems[id] = checkbox.checked;
+            });
+            
+            healthData[date].stopMedicationDetail = document.getElementById('stopMedicationDetail').value;
+            healthData[date].notes = document.getElementById('otherNotes').value;
+            
+            saveData();
+            showAutoSaveIndicator();
+        }
+        
+        // 添加生命体征
+        function addVitalRecord() {
+            const date = document.getElementById('recordDate').value;
+            const time = document.getElementById('vitalTime').value;
+            const bpHigh = document.getElementById('bloodPressureHigh').value;
+            const bpLow = document.getElementById('bloodPressureLow').value;
+            const hr = document.getElementById('heartRate').value;
+            const oxygen = document.getElementById('oxygenSaturation').value;
+            
+            if (!time) {
+                showToast('请选择测量时间');
+                return;
+            }
+            
+            if (!healthData[date]) healthData[date] = {
+                vitals: [], bathroom: [], medications: [],
+                swelling: { left: 0, right: 0 }, dailyItems: {}
+            };
+            
+            healthData[date].vitals.push({
+                id: Date.now(), time,
+                bloodPressureHigh: parseInt(bpHigh) || 0,
+                bloodPressureLow: parseInt(bpLow) || 0,
+                heartRate: parseInt(hr) || 0,
+                oxygenSaturation: parseInt(oxygen) || 0
+            });
+            
+            // 清空输入框
+            document.getElementById('bloodPressureHigh').value = '';
+            document.getElementById('bloodPressureLow').value = '';
+            document.getElementById('heartRate').value = '';
+            document.getElementById('oxygenSaturation').value = '';
+            
+            saveAndRefresh();
+            showToast('生命体征记录已添加');
+        }
+        
+        // 添加大小便记录
+        function addBathroomRecord(type) {
+            const date = document.getElementById('recordDate').value;
+            const time = new Date().toTimeString().slice(0, 5);
+            
+            if (!healthData[date]) healthData[date] = {
+                vitals: [], bathroom: [], medications: [],
+                swelling: { left: 0, right: 0 }, dailyItems: {}
+            };
+            
+            healthData[date].bathroom.push({
+                id: Date.now(), time, type
+            });
+            
+            saveAndRefresh();
+            showToast(type === 'urine' ? '小便记录已添加' : '大便记录已添加');
+        }
+        
+        // 添加用药记录
+        function addMedicationRecord() {
+            const date = document.getElementById('recordDate').value;
+            const time = document.getElementById('medicationTime').value;
+            const name = document.getElementById('medicationName').value;
+            
+            if (!time || !name) {
+                showToast('请输入完整的用药信息');
+                return;
+            }
+            
+            if (!healthData[date]) healthData[date] = {
+                vitals: [], bathroom: [], medications: [],
+                swelling: { left: 0, right: 0 }, dailyItems: {}
+            };
+            
+            healthData[date].medications.push({
+                id: Date.now(), time, name, taken: true
+            });
+            
+            document.getElementById('medicationName').value = '';
+            saveAndRefresh();
+            showToast('用药记录已添加');
+        }
+        
+        // 更新浮肿值显示
+        function updateSwelling(side, value) {
+            document.getElementById(side + 'SwellingValue').textContent = value;
+        }
+        
+        // 保存浮肿记录
+        function saveSwellingRecord() {
+            const date = document.getElementById('recordDate').value;
+            const left = document.getElementById('leftSwelling').value;
+            const right = document.getElementById('rightSwelling').value;
+            
+            if (!healthData[date]) healthData[date] = {
+                vitals: [], bathroom: [], medications: [],
+                swelling: { left: 0, right: 0 }, dailyItems: {}
+            };
+            
+            healthData[date].swelling = {
+                left: parseInt(left), right: parseInt(right),
+                time: new Date().toTimeString().slice(0, 5)
+            };
+            
+            saveAndRefresh();
+            showToast('浮肿记录已保存');
+        }
+        
+        // 删除记录
+        function deleteRecord(type, id) {
+            const date = document.getElementById('recordDate').value;
+            if (healthData[date] && healthData[date][type]) {
+                healthData[date][type] = healthData[date][type].filter(record => record.id !== id);
+                saveAndRefresh();
+                showToast('记录已删除');
+            }
+        }
+        
+        // 保存数据并刷新显示
+        function saveAndRefresh() {
+            saveData();
+            showAutoSaveIndicator();
+            const date = document.getElementById('recordDate').value;
+            loadDayData(date);
+        }
+        
+        // 保存数据到localStorage
+        function saveData() {
+            localStorage.setItem('healthData', JSON.stringify(healthData));
+        }
+        
+        // 更新统计数据
+        function updateStats() {
+            const date = document.getElementById('recordDate').value;
+            const dayData = healthData[date] || {
+                vitals: [], bathroom: [], medications: [],
+                swelling: { left: 0, right: 0 }, dailyItems: {}
+            };
+            
+            // 基础统计
+            const urineCount = dayData.bathroom.filter(r => r.type === 'urine').length;
+            const stoolCount = dayData.bathroom.filter(r => r.type === 'stool').length;
+            const vitalCount = dayData.vitals.length;
+            const medicationCount = dayData.medications.length;
+            
+            document.getElementById('urineCount').textContent = urineCount;
+            document.getElementById('stoolCount').textContent = stoolCount;
+            document.getElementById('vitalCount').textContent = vitalCount;
+            document.getElementById('medicationCount').textContent = medicationCount;
+            
+            // 生命体征统计
+            if (dayData.vitals.length > 0) {
+                const bpHighValues = dayData.vitals.filter(v => v.bloodPressureHigh > 0).map(v => v.bloodPressureHigh);
+                const bpLowValues = dayData.vitals.filter(v => v.bloodPressureLow > 0).map(v => v.bloodPressureLow);
+                const hrValues = dayData.vitals.filter(v => v.heartRate > 0).map(v => v.heartRate);
+                
+                if (bpHighValues.length > 0) {
+                    const maxBpHigh = Math.max(...bpHighValues);
+                    const maxBpLow = Math.max(...bpLowValues);
+                    document.getElementById('bloodPressureMax').textContent = `${maxBpHigh}/${maxBpLow}`;
+                } else {
+                    document.getElementById('bloodPressureMax').textContent = '--/--';
+                }
+                
+                if (hrValues.length > 0) {
+                    const maxHr = Math.max(...hrValues);
+                    document.getElementById('heartRateMax').textContent = maxHr;
+                } else {
+                    document.getElementById('heartRateMax').textContent = '--';
+                }
+            } else {
+                document.getElementById('bloodPressureMax').textContent = '--/--';
+                document.getElementById('heartRateMax').textContent = '--';
+            }
+            
+            // 浮肿程度
+            document.getElementById('swellingLevel').textContent = `${dayData.swelling.left || 0}/${dayData.swelling.right || 0}`;
+            
+            // 日常评分
+            const dailyItems = dayData.dailyItems || {};
+            const totalItems = 6; // 总共6个日常事项
+            const completedItems = Object.values(dailyItems).filter(Boolean).length;
+            const score = Math.round((completedItems / totalItems) * 100);
+            document.getElementById('dailyScore').textContent = score + '%';
+            
+            // 更新7日趋势
+            updateWeeklyStats();
+        }
+        
+        // 更新7日趋势
+        function updateWeeklyStats() {
+            const weeklyContainer = document.getElementById('weeklyStats');
+            const dates = [];
+            const today = new Date();
+            
+            // 获取最近7天的日期
+            for (let i = 6; i >= 0; i--) {
+                const date = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+                dates.push(date.toISOString().split('T')[0]);
+            }
+            
+            let html = '<div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; text-align: center;">';
+            
+            dates.forEach(date => {
+                const dayData = healthData[date] || { vitals: [], bathroom: [], medications: [] };
+                const urineCount = dayData.bathroom.filter(r => r.type === 'urine').length;
+                const stoolCount = dayData.bathroom.filter(r => r.type === 'stool').length;
+                const dayOfWeek = new Date(date).toLocaleDateString('zh-CN', { weekday: 'short' });
+                const isToday = date === new Date().toISOString().split('T')[0];
+                
+                html += `
+                    <div style="padding: 8px; background: ${isToday ? '#007AFF' : '#f0f9ff'}; 
+                                border-radius: 8px; color: ${isToday ? 'white' : '#333'}; font-size: 12px;">
+                        <div style="font-weight: bold;">${dayOfWeek}</div>
+                        <div style="margin: 4px 0;">💧${urineCount}</div>
+                        <div>💩${stoolCount}</div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            weeklyContainer.innerHTML = html;
+        }
+        
+        // 更新历史记录
+        function updateHistory() {
+            const historyContainer = document.getElementById('historyList');
+            const dates = Object.keys(healthData).sort().reverse().slice(0, 30);
+            
+            if (dates.length === 0) {
+                historyContainer.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📚</div><p>暂无历史记录</p></div>';
+                return;
+            }
+            
+            const html = dates.map(date => {
+                const dayData = healthData[date];
+                const urineCount = dayData.bathroom?.filter(r => r.type === 'urine').length || 0;
+                const stoolCount = dayData.bathroom?.filter(r => r.type === 'stool').length || 0;
+                const vitalCount = dayData.vitals?.length || 0;
+                const medicationCount = dayData.medications?.length || 0;
+                
+                // 计算平均血压和心率
+                let avgBp = '--/--';
+                let avgHr = '--';
+                if (dayData.vitals && dayData.vitals.length > 0) {
+                    const bpHighValues = dayData.vitals.filter(v => v.bloodPressureHigh > 0).map(v => v.bloodPressureHigh);
+                    const bpLowValues = dayData.vitals.filter(v => v.bloodPressureLow > 0).map(v => v.bloodPressureLow);
+                    const hrValues = dayData.vitals.filter(v => v.heartRate > 0).map(v => v.heartRate);
+                    
+                    if (bpHighValues.length > 0) {
+                        const avgBpHigh = Math.round(bpHighValues.reduce((a, b) => a + b, 0) / bpHighValues.length);
+                        const avgBpLow = Math.round(bpLowValues.reduce((a, b) => a + b, 0) / bpLowValues.length);
+                        avgBp = `${avgBpHigh}/${avgBpLow}`;
+                    }
+                    
+                    if (hrValues.length > 0) {
+                        avgHr = Math.round(hrValues.reduce((a, b) => a + b, 0) / hrValues.length);
+                    }
+                }
+                
+                return `
+                    <div class="history-item">
+                        <div class="history-date">${date}</div>
+                        <div class="history-summary">
+                            <div>💧 ${urineCount}次</div>
+                            <div>💩 ${stoolCount}次</div>
+                            <div>❤️ ${vitalCount}次</div>
+                            <div>💊 ${medicationCount}次</div>
+                            <div>🩸 ${avgBp}</div>
+                            <div>💓 ${avgHr}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            historyContainer.innerHTML = html;
+        }
+        
+        // 更新数据统计
+        function updateDataStats() {
+            const totalDays = Object.keys(healthData).length;
+            let totalEntries = 0;
+            
+            Object.values(healthData).forEach(dayData => {
+                totalEntries += (dayData.vitals?.length || 0);
+                totalEntries += (dayData.bathroom?.length || 0);
+                totalEntries += (dayData.medications?.length || 0);
+                if (dayData.swelling && (dayData.swelling.left > 0 || dayData.swelling.right > 0)) {
+                    totalEntries += 1;
+                }
+            });
+            
+            document.getElementById('dataStats').innerHTML = `
+                记录天数: <strong>${totalDays}</strong> 天<br>
+                总条目数: <strong>${totalEntries}</strong> 条<br>
+                数据大小: <strong>${Math.round(JSON.stringify(healthData).length / 1024)}</strong> KB
+            `;
+        }
+        
+        // 导出数据
+        function exportData() {
+            const dataStr = JSON.stringify(healthData, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            
+            // 创建下载链接
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = `健康记录_${new Date().toISOString().split('T')[0]}.json`;
+            
+            // 触发下载
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showToast('数据导出成功');
+        }
+        
+        // 导入数据
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    if (confirm('导入数据将覆盖现有数据，确定继续吗？')) {
+                        healthData = importedData;
+                        saveData();
+                        showToast('数据导入成功');
+                        updateDate();
+                        updateDataStats();
+                    }
+                } catch (error) {
+                    showToast('数据格式错误，导入失败');
+                }
+            };
+            reader.readAsText(file);
+        }
+        
+        // 清空所有数据
+        function clearAllData() {
+            if (confirm('确定要清空所有数据吗？此操作不可恢复！')) {
+                healthData = {};
+                saveData();
+                showToast('所有数据已清空');
+                updateDate();
+                updateDataStats();
+            }
+        }
+        
+        // 页面加载时初始化
+        window.onload = function() {
+            init();
+            updateDataStats();
+        };
+    </script>
+</body>
+</html>
