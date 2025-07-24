@@ -373,6 +373,7 @@
                 <button class="btn btn-success" onclick="addBathroomRecord('urine')">💧 小便</button>
                 <button class="btn btn-success" onclick="addBathroomRecord('stool')">💩 大便</button>
             </div>
+            <div id="bathroomRecords"></div>
         </div>
 
         <!-- 生命体征 -->
@@ -491,10 +492,12 @@
                 <div class="stat-card">
                     <div class="stat-number" id="urineCount">0</div>
                     <div class="stat-label">小便次数</div>
+                    <div class="stat-detail" id="urineDetail" style="font-size: 10px; color: #999; margin-top: 4px;">--</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="stoolCount">0</div>
                     <div class="stat-label">大便次数</div>
+                    <div class="stat-detail" id="stoolDetail" style="font-size: 10px; color: #999; margin-top: 4px;">--</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number" id="vitalCount">0</div>
@@ -695,6 +698,26 @@
                 `).join('');
             }
             
+            // 大小便记录 - 显示具体时间
+            const bathroomContainer = document.getElementById('bathroomRecords');
+            if (dayData.bathroom.length === 0) {
+                bathroomContainer.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🚻</div><p>暂无大小便记录</p></div>';
+            } else {
+                // 按时间排序显示
+                const sortedBathroom = dayData.bathroom.sort((a, b) => a.time.localeCompare(b.time));
+                bathroomContainer.innerHTML = sortedBathroom.map(record => `
+                    <div class="record-item">
+                        <div class="record-info">
+                            <div class="record-time">${record.time}</div>
+                            <div class="record-details">
+                                ${record.type === 'urine' ? '💧 小便' : '💩 大便'}
+                            </div>
+                        </div>
+                        <button class="btn btn-danger btn-small" onclick="deleteRecord('bathroom', ${record.id})">删除</button>
+                    </div>
+                `).join('');
+            }
+            
             // 用药记录
             const medContainer = document.getElementById('medicationRecords');
             if (dayData.medications.length === 0) {
@@ -887,6 +910,28 @@
             document.getElementById('vitalCount').textContent = vitalCount;
             document.getElementById('medicationCount').textContent = medicationCount;
             
+            // 显示大小便的详细时间信息
+            const urineTimes = dayData.bathroom.filter(r => r.type === 'urine').map(r => r.time).sort();
+            const stoolTimes = dayData.bathroom.filter(r => r.type === 'stool').map(r => r.time).sort();
+            
+            if (urineTimes.length > 0) {
+                document.getElementById('urineDetail').textContent = 
+                    urineTimes.length === 1 ? 
+                    `时间: ${urineTimes[0]}` : 
+                    `首次: ${urineTimes[0]} | 末次: ${urineTimes[urineTimes.length-1]}`;
+            } else {
+                document.getElementById('urineDetail').textContent = '暂无记录';
+            }
+            
+            if (stoolTimes.length > 0) {
+                document.getElementById('stoolDetail').textContent = 
+                    stoolTimes.length === 1 ? 
+                    `时间: ${stoolTimes[0]}` : 
+                    `首次: ${stoolTimes[0]} | 末次: ${stoolTimes[stoolTimes.length-1]}`;
+            } else {
+                document.getElementById('stoolDetail').textContent = '暂无记录';
+            }
+            
             // 生命体征统计
             if (dayData.vitals.length > 0) {
                 const bpHighValues = dayData.vitals.filter(v => v.bloodPressureHigh > 0).map(v => v.bloodPressureHigh);
@@ -973,8 +1018,8 @@
             
             const html = dates.map(date => {
                 const dayData = healthData[date];
-                const urineCount = dayData.bathroom?.filter(r => r.type === 'urine').length || 0;
-                const stoolCount = dayData.bathroom?.filter(r => r.type === 'stool').length || 0;
+                const urineRecords = dayData.bathroom?.filter(r => r.type === 'urine') || [];
+                const stoolRecords = dayData.bathroom?.filter(r => r.type === 'stool') || [];
                 const vitalCount = dayData.vitals?.length || 0;
                 const medicationCount = dayData.medications?.length || 0;
                 
@@ -997,12 +1042,26 @@
                     }
                 }
                 
+                // 生成大小便时间详情
+                let bathroomDetails = '';
+                if (urineRecords.length > 0) {
+                    const urineTimes = urineRecords.map(r => r.time).sort();
+                    bathroomDetails += `💧 ${urineRecords.length}次 (${urineTimes.join(', ')})`;
+                }
+                if (stoolRecords.length > 0) {
+                    const stoolTimes = stoolRecords.map(r => r.time).sort();
+                    if (bathroomDetails) bathroomDetails += '<br>';
+                    bathroomDetails += `💩 ${stoolRecords.length}次 (${stoolTimes.join(', ')})`;
+                }
+                if (!bathroomDetails) bathroomDetails = '暂无大小便记录';
+                
                 return `
                     <div class="history-item">
                         <div class="history-date">${date}</div>
+                        <div style="margin: 8px 0; font-size: 14px; line-height: 1.4;">
+                            ${bathroomDetails}
+                        </div>
                         <div class="history-summary">
-                            <div>💧 ${urineCount}次</div>
-                            <div>💩 ${stoolCount}次</div>
                             <div>❤️ ${vitalCount}次</div>
                             <div>💊 ${medicationCount}次</div>
                             <div>🩸 ${avgBp}</div>
