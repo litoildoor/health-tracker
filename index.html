@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>钱教授健康记录</title>
+    <title>健康记录</title>
     
     <!-- PWA配置 -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="钱教授健康记录">
+    <meta name="apple-mobile-web-app-title" content="健康记录">
     <meta name="theme-color" content="#007AFF">
     
     <style>
@@ -566,6 +566,62 @@
             <button class="btn" onclick="document.getElementById('importFile').click()">📥 导入数据</button>
             <button class="btn btn-danger" onclick="clearAllData()">🗑️ 清空数据</button>
             <input type="file" id="importFile" style="display: none;" accept=".json" onchange="importData(event)">
+            
+            <!-- 新增：数据同步功能 -->
+            <div style="margin-top: 20px; padding: 16px; background: #e8f5e8; border-radius: 8px; border: 1px solid #28a745;">
+                <h4>🔄 数据同步</h4>
+                <p style="font-size: 14px; color: #666; margin: 8px 0;">在不同设备间共享健康记录数据</p>
+                
+                <button class="btn btn-success" onclick="generateShareCode()">📋 生成分享码</button>
+                <button class="btn" onclick="showSyncInput()">🔗 输入分享码</button>
+                <button class="btn" onclick="showQRCode()" style="background: #6f42c1;">📱 生成二维码</button>
+                
+                <div id="shareCodeResult" style="margin-top: 10px; display: none;">
+                    <div style="background: white; padding: 12px; border-radius: 8px; border: 1px solid #ddd;">
+                        <p style="font-size: 14px; margin-bottom: 8px;"><strong>数据分享码:</strong></p>
+                        <textarea id="shareCodeText" readonly style="width: 100%; height: 80px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 12px; resize: vertical;"></textarea>
+                        <div style="display: flex; gap: 8px; margin-top: 8px;">
+                            <button class="btn btn-small" onclick="copyShareCode()">📋 复制</button>
+                            <button class="btn btn-small" onclick="shareViaMessage()" style="background: #28a745;">💬 发送</button>
+                        </div>
+                        <p style="font-size: 12px; color: #666; margin-top: 8px;">
+                            💡 使用方法：复制分享码 → 通过微信发送 → 对方粘贴到"输入分享码"
+                        </p>
+                    </div>
+                </div>
+                
+                <div id="qrCodeResult" style="margin-top: 10px; display: none;">
+                    <div style="background: white; padding: 12px; border-radius: 8px; border: 1px solid #ddd; text-align: center;">
+                        <p style="font-size: 14px; margin-bottom: 8px;"><strong>扫码同步数据:</strong></p>
+                        <div id="qrCodeContainer" style="margin: 16px 0;"></div>
+                        <p style="font-size: 12px; color: #666;">用另一台设备扫描此二维码即可同步数据</p>
+                    </div>
+                </div>
+                
+                <div id="syncInput" style="margin-top: 10px; display: none;">
+                    <div style="background: white; padding: 12px; border-radius: 8px; border: 1px solid #ddd;">
+                        <p style="font-size: 14px; margin-bottom: 8px;"><strong>输入分享码同步数据:</strong></p>
+                        <textarea id="inputShareCode" placeholder="粘贴完整的分享码到这里..." style="width: 100%; height: 80px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 12px; resize: vertical;"></textarea>
+                        <div style="display: flex; gap: 8px; margin-top: 8px;">
+                            <button class="btn btn-small" onclick="syncWithCode()">🔄 同步数据</button>
+                            <button class="btn btn-small" onclick="hideSyncInput()" style="background: #6c757d;">❌ 取消</button>
+                        </div>
+                        <p style="font-size: 12px; color: #666; margin-top: 8px;">
+                            💡 粘贴完整分享码后点击"同步数据"即可获取最新健康记录
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- 使用说明 -->
+                <div style="margin-top: 16px; padding: 12px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #007AFF;">
+                    <p style="font-size: 14px; font-weight: bold; margin-bottom: 8px;">📚 同步说明:</p>
+                    <p style="font-size: 12px; line-height: 1.4; color: #666;">
+                        1️⃣ <strong>发送数据</strong>：点击"生成分享码" → 复制 → 微信发送给对方<br>
+                        2️⃣ <strong>接收数据</strong>：点击"输入分享码" → 粘贴 → 同步数据<br>
+                        3️⃣ <strong>二维码</strong>：生成二维码让对方扫描同步（需支持二维码的设备）
+                    </p>
+                </div>
+            </div>
             
             <div style="margin-top: 20px; padding: 16px; background: #f8f9fa; border-radius: 8px;">
                 <h4>📊 数据统计</h4>
@@ -1280,6 +1336,227 @@
                 showToast('所有数据已清空');
                 updateDate();
                 updateDataStats();
+            }
+        }
+        
+        // 新增：数据同步功能（简化版，无需网络）
+        
+        // 生成分享码（本地编码，无需网络）
+        function generateShareCode() {
+            try {
+                // 添加时间戳和基本验证信息
+                const shareData = {
+                    data: healthData,
+                    timestamp: Date.now(),
+                    version: '1.0',
+                    deviceInfo: navigator.userAgent.slice(0, 50) // 设备简要信息
+                };
+                
+                const dataStr = JSON.stringify(shareData);
+                // 使用Base64编码（安全且兼容性好）
+                const encoded = btoa(unescape(encodeURIComponent(dataStr)));
+                
+                // 添加标识前缀便于识别
+                const shareCode = 'HEALTH_DATA_' + encoded;
+                
+                document.getElementById('shareCodeText').value = shareCode;
+                document.getElementById('shareCodeResult').style.display = 'block';
+                document.getElementById('qrCodeResult').style.display = 'none';
+                
+                showToast('分享码生成成功！');
+            } catch (error) {
+                console.error('生成分享码失败:', error);
+                showToast('生成分享码失败，请重试');
+            }
+        }
+        
+        // 生成二维码
+        function showQRCode() {
+            try {
+                // 先生成分享码
+                const shareData = {
+                    data: healthData,
+                    timestamp: Date.now(),
+                    version: '1.0'
+                };
+                
+                const dataStr = JSON.stringify(shareData);
+                const encoded = btoa(unescape(encodeURIComponent(dataStr)));
+                const shareCode = 'HEALTH_DATA_' + encoded;
+                
+                // 生成简单的二维码（文本形式，因为真正的二维码需要外部库）
+                const qrContainer = document.getElementById('qrCodeContainer');
+                qrContainer.innerHTML = `
+                    <div style="background: #f8f9fa; padding: 20px; border: 2px dashed #007AFF; border-radius: 8px;">
+                        <p style="font-size: 16px; margin-bottom: 10px;">📱 二维码功能</p>
+                        <p style="font-size: 14px; color: #666; margin-bottom: 15px;">
+                            由于技术限制，暂时使用分享码方式<br>
+                            请点击下方按钮复制分享码
+                        </p>
+                        <button class="btn btn-small" onclick="copyQRData()" style="background: #007AFF;">📋 复制数据</button>
+                    </div>
+                `;
+                
+                // 临时存储二维码数据
+                window.tempQRData = shareCode;
+                
+                document.getElementById('qrCodeResult').style.display = 'block';
+                document.getElementById('shareCodeResult').style.display = 'none';
+                
+                showToast('二维码数据已准备就绪');
+            } catch (error) {
+                showToast('生成二维码失败');
+            }
+        }
+        
+        // 复制二维码数据
+        function copyQRData() {
+            if (window.tempQRData) {
+                copyToClipboard(window.tempQRData);
+                showToast('二维码数据已复制');
+            }
+        }
+        
+        // 复制分享码
+        function copyShareCode() {
+            const shareCodeText = document.getElementById('shareCodeText');
+            copyToClipboard(shareCodeText.value);
+        }
+        
+        // 统一的复制函数
+        function copyToClipboard(text) {
+            // 尝试现代API
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showToast('已复制到剪贴板');
+                }).catch(() => {
+                    fallbackCopy(text);
+                });
+            } else {
+                fallbackCopy(text);
+            }
+        }
+        
+        // 备用复制方法
+        function fallbackCopy(text) {
+            // 创建临时文本区域
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                document.execCommand('copy');
+                showToast('已复制到剪贴板');
+            } catch (err) {
+                console.error('复制失败:', err);
+                showToast('复制失败，请手动复制');
+            }
+            
+            document.body.removeChild(textArea);
+        }
+        
+        // 通过消息分享
+        function shareViaMessage() {
+            const shareCodeText = document.getElementById('shareCodeText').value;
+            
+            // 构建分享文本
+            const shareText = `🏥 健康记录数据分享\n\n` +
+                             `📋 分享码：\n${shareCodeText}\n\n` +
+                             `📱 使用方法：\n` +
+                             `1. 打开健康记录系统\n` +
+                             `2. 点击"设置" → "输入分享码"\n` +
+                             `3. 粘贴以上分享码\n` +
+                             `4. 点击"同步数据"完成\n\n` +
+                             `⏰ 数据生成时间：${new Date().toLocaleString()}`;
+            
+            // 尝试使用Web Share API
+            if (navigator.share) {
+                navigator.share({
+                    title: '健康记录数据',
+                    text: shareText
+                }).catch(err => {
+                    console.log('分享取消或失败:', err);
+                    copyToClipboard(shareText);
+                    showToast('分享内容已复制，可手动发送');
+                });
+            } else {
+                // 备用方案：复制到剪贴板
+                copyToClipboard(shareText);
+                showToast('分享内容已复制，请手动发送给对方');
+            }
+        }
+        
+        // 显示同步输入框
+        function showSyncInput() {
+            document.getElementById('syncInput').style.display = 'block';
+            document.getElementById('shareCodeResult').style.display = 'none';
+            document.getElementById('qrCodeResult').style.display = 'none';
+        }
+        
+        // 隐藏同步输入框
+        function hideSyncInput() {
+            document.getElementById('syncInput').style.display = 'none';
+            document.getElementById('inputShareCode').value = '';
+        }
+        
+        // 使用分享码同步数据
+        function syncWithCode() {
+            const shareCodeInput = document.getElementById('inputShareCode');
+            const shareCode = shareCodeInput.value.trim();
+            
+            if (!shareCode) {
+                showToast('请输入分享码');
+                return;
+            }
+            
+            try {
+                // 检查分享码格式
+                if (!shareCode.startsWith('HEALTH_DATA_')) {
+                    throw new Error('分享码格式错误');
+                }
+                
+                // 解码数据
+                const encodedData = shareCode.replace('HEALTH_DATA_', '');
+                const decodedStr = decodeURIComponent(escape(atob(encodedData)));
+                const shareData = JSON.parse(decodedStr);
+                
+                // 验证数据格式
+                if (!shareData.data || !shareData.timestamp) {
+                    throw new Error('分享码数据格式不正确');
+                }
+                
+                // 检查数据时效性（可选，这里设置7天有效期）
+                const daysDiff = (Date.now() - shareData.timestamp) / (1000 * 60 * 60 * 24);
+                if (daysDiff > 7) {
+                    if (!confirm('此分享码已超过7天，数据可能较旧，确定要同步吗？')) {
+                        return;
+                    }
+                }
+                
+                // 显示数据预览
+                const dataPreview = `
+                    数据生成时间: ${new Date(shareData.timestamp).toLocaleString()}
+                    记录天数: ${Object.keys(shareData.data).length} 天
+                    数据版本: ${shareData.version || '未知'}
+                `;
+                
+                if (confirm(`即将同步以下数据：\n\n${dataPreview}\n\n同步将覆盖当前所有数据，确定继续吗？`)) {
+                    healthData = shareData.data;
+                    saveData();
+                    showToast('数据同步成功！');
+                    updateDate();
+                    updateDataStats();
+                    hideSyncInput();
+                }
+                
+            } catch (error) {
+                console.error('同步失败:', error);
+                showToast('分享码格式错误或已损坏，请检查后重试');
             }
         }
         
