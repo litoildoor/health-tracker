@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>健康记录</title>
+    <title>钱教授健康记录</title>
     
     <!-- PWA配置 -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="健康记录">
+    <meta name="apple-mobile-web-app-title" content="钱教授健康记录">
     <meta name="theme-color" content="#007AFF">
     
     <style>
@@ -403,7 +403,18 @@
                     <input type="number" id="oxygenSaturation" class="form-input" placeholder="%">
                 </div>
             </div>
+            <div class="form-group">
+                <label>体重 (kg)</label>
+                <input type="number" id="weight" class="form-input" placeholder="如：65.5" step="0.1">
+                <div id="weightComparison" style="font-size: 12px; color: #666; margin-top: 4px;"></div>
+            </div>
             <button class="btn" onclick="addVitalRecord()">➕ 添加记录</button>
+            
+            <!-- 体重记录区域 -->
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+                <button class="btn btn-success" onclick="saveWeightRecord()">⚖️ 保存体重记录</button>
+            </div>
+            
             <div id="vitalRecords"></div>
         </div>
 
@@ -525,6 +536,11 @@
                     <div class="stat-number" id="dailyScore">--</div>
                     <div class="stat-label">日常评分</div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="currentWeight">--</div>
+                    <div class="stat-label">当前体重(kg)</div>
+                    <div class="stat-detail" id="weightChange" style="font-size: 10px; color: #999; margin-top: 4px;">--</div>
+                </div>
             </div>
         </div>
 
@@ -622,7 +638,7 @@
             setTimeout(() => toast.classList.remove('show'), 2000);
         }
         
-        // 标签页切换 - 修复函数定义
+        // 标签页切换
         function switchTab(tabName) {
             // 隐藏所有标签页内容
             document.querySelectorAll('.tab-content').forEach(content => {
@@ -661,7 +677,7 @@
         function loadDayData(date) {
             const dayData = healthData[date] || {
                 vitals: [], bathroom: [], medications: [],
-                swelling: { left: 0, right: 0 }, dailyItems: {}, notes: ''
+                swelling: { left: 0, right: 0 }, dailyItems: {}, notes: '', weight: null
             };
             
             displayRecords(dayData);
@@ -673,6 +689,10 @@
             document.getElementById('rightSwelling').value = dayData.swelling.right || 0;
             updateSwelling('left', dayData.swelling.left || 0);
             updateSwelling('right', dayData.swelling.right || 0);
+            
+            // 加载体重数据
+            document.getElementById('weight').value = dayData.weight || '';
+            updateWeightComparison(date);
             
             updateStats();
         }
@@ -761,6 +781,69 @@
             
             saveData();
             showAutoSaveIndicator();
+        }
+        
+        // 更新体重对比信息
+        function updateWeightComparison(currentDate) {
+            const currentWeight = document.getElementById('weight').value;
+            const comparisonDiv = document.getElementById('weightComparison');
+            
+            if (!currentWeight) {
+                comparisonDiv.textContent = '';
+                return;
+            }
+            
+            // 获取前一天的体重
+            const prevDate = getPreviousDate(currentDate);
+            const prevDayData = healthData[prevDate];
+            const prevWeight = prevDayData?.weight;
+            
+            if (prevWeight) {
+                const difference = (parseFloat(currentWeight) - parseFloat(prevWeight)).toFixed(1);
+                const absChange = Math.abs(difference);
+                
+                if (difference > 0) {
+                    comparisonDiv.innerHTML = `<span style="color: #dc3545;">↗ 较昨日增加 ${absChange}kg</span>`;
+                } else if (difference < 0) {
+                    comparisonDiv.innerHTML = `<span style="color: #28a745;">↘ 较昨日减少 ${absChange}kg</span>`;
+                } else {
+                    comparisonDiv.innerHTML = `<span style="color: #6c757d;">↔ 与昨日相同</span>`;
+                }
+            } else {
+                comparisonDiv.innerHTML = `<span style="color: #6c757d;">暂无昨日数据对比</span>`;
+            }
+        }
+        
+        // 获取前一天的日期
+        function getPreviousDate(dateStr) {
+            const date = new Date(dateStr);
+            date.setDate(date.getDate() - 1);
+            return date.toISOString().split('T')[0];
+        }
+        
+        // 保存体重记录
+        function saveWeightRecord() {
+            const date = document.getElementById('recordDate').value;
+            const weight = document.getElementById('weight').value;
+            
+            if (!weight) {
+                showToast('请输入体重');
+                return;
+            }
+            
+            if (!healthData[date]) healthData[date] = {
+                vitals: [], bathroom: [], medications: [],
+                swelling: { left: 0, right: 0 }, dailyItems: {}
+            };
+            
+            healthData[date].weight = parseFloat(weight);
+            healthData[date].weightTime = new Date().toTimeString().slice(0, 5);
+            
+            saveData();
+            showAutoSaveIndicator();
+            updateWeightComparison(date);
+            updateStats();
+            showToast('体重记录已保存');
         }
         
         // 添加生命体征
@@ -967,6 +1050,35 @@
             const score = Math.round((completedItems / totalItems) * 100);
             document.getElementById('dailyScore').textContent = score + '%';
             
+            // 体重显示和变化
+            const currentWeight = dayData.weight;
+            if (currentWeight) {
+                document.getElementById('currentWeight').textContent = currentWeight + 'kg';
+                
+                // 计算与前一天的变化
+                const prevDate = getPreviousDate(date);
+                const prevDayData = healthData[prevDate];
+                const prevWeight = prevDayData?.weight;
+                
+                if (prevWeight) {
+                    const difference = (currentWeight - prevWeight).toFixed(1);
+                    const absChange = Math.abs(difference);
+                    
+                    if (difference > 0) {
+                        document.getElementById('weightChange').innerHTML = `<span style="color: #dc3545;">↗ +${absChange}kg</span>`;
+                    } else if (difference < 0) {
+                        document.getElementById('weightChange').innerHTML = `<span style="color: #28a745;">↘ -${absChange}kg</span>`;
+                    } else {
+                        document.getElementById('weightChange').innerHTML = `<span style="color: #6c757d;">↔ 无变化</span>`;
+                    }
+                } else {
+                    document.getElementById('weightChange').textContent = '无昨日数据';
+                }
+            } else {
+                document.getElementById('currentWeight').textContent = '--';
+                document.getElementById('weightChange').textContent = '未记录';
+            }
+            
             // 更新7日趋势
             updateWeeklyStats();
         }
@@ -1055,11 +1167,32 @@
                 }
                 if (!bathroomDetails) bathroomDetails = '暂无大小便记录';
                 
+                // 体重信息
+                let weightInfo = '';
+                if (dayData.weight) {
+                    const prevDate = getPreviousDate(date);
+                    const prevDayData = healthData[prevDate];
+                    const prevWeight = prevDayData?.weight;
+                    
+                    if (prevWeight) {
+                        const difference = (dayData.weight - prevWeight).toFixed(1);
+                        const changeText = difference > 0 ? `+${difference}` : difference;
+                        weightInfo = `⚖️ ${dayData.weight}kg (${changeText}kg)`;
+                    } else {
+                        weightInfo = `⚖️ ${dayData.weight}kg`;
+                    }
+                } else {
+                    weightInfo = '⚖️ 未记录体重';
+                }
+                
                 return `
                     <div class="history-item">
                         <div class="history-date">${date}</div>
                         <div style="margin: 8px 0; font-size: 14px; line-height: 1.4;">
                             ${bathroomDetails}
+                        </div>
+                        <div style="margin: 8px 0; font-size: 14px; color: #007AFF;">
+                            ${weightInfo}
                         </div>
                         <div class="history-summary">
                             <div>❤️ ${vitalCount}次</div>
@@ -1084,6 +1217,9 @@
                 totalEntries += (dayData.bathroom?.length || 0);
                 totalEntries += (dayData.medications?.length || 0);
                 if (dayData.swelling && (dayData.swelling.left > 0 || dayData.swelling.right > 0)) {
+                    totalEntries += 1;
+                }
+                if (dayData.weight) {
                     totalEntries += 1;
                 }
             });
@@ -1151,6 +1287,15 @@
         window.onload = function() {
             init();
             updateDataStats();
+            
+            // 为体重输入框添加事件监听
+            const weightInput = document.getElementById('weight');
+            if (weightInput) {
+                weightInput.addEventListener('input', function() {
+                    const date = document.getElementById('recordDate').value;
+                    updateWeightComparison(date);
+                });
+            }
         };
     </script>
 </body>
