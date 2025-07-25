@@ -583,6 +583,7 @@
                         <div style="display: flex; gap: 8px; margin-top: 8px;">
                             <button class="btn btn-small" onclick="copyShareCode()">📋 复制</button>
                             <button class="btn btn-small" onclick="shareViaMessage()" style="background: #28a745;">💬 发送</button>
+                            <button class="btn btn-small" onclick="testSync()" style="background: #ffc107; color: #000;">🔧 测试</button>
                         </div>
                         <p style="font-size: 12px; color: #666; margin-top: 8px;">
                             💡 使用方法：复制分享码 → 通过微信发送 → 对方粘贴到"输入分享码"
@@ -1504,7 +1505,7 @@
             document.getElementById('inputShareCode').value = '';
         }
         
-        // 使用分享码同步数据
+        // 使用分享码同步数据（增强调试版本）
         function syncWithCode() {
             const shareCodeInput = document.getElementById('inputShareCode');
             const shareCode = shareCodeInput.value.trim();
@@ -1514,50 +1515,166 @@
                 return;
             }
             
+            console.log('开始同步，分享码长度:', shareCode.length);
+            console.log('分享码前50个字符:', shareCode.substring(0, 50));
+            
             try {
                 // 检查分享码格式
                 if (!shareCode.startsWith('HEALTH_DATA_')) {
-                    throw new Error('分享码格式错误');
+                    showToast('分享码格式错误：缺少标识前缀');
+                    console.log('错误：分享码不是以HEALTH_DATA_开头');
+                    return;
                 }
                 
                 // 解码数据
                 const encodedData = shareCode.replace('HEALTH_DATA_', '');
-                const decodedStr = decodeURIComponent(escape(atob(encodedData)));
-                const shareData = JSON.parse(decodedStr);
+                console.log('提取编码数据长度:', encodedData.length);
+                
+                let decodedStr;
+                try {
+                    decodedStr = decodeURIComponent(escape(atob(encodedData)));
+                    console.log('解码成功，数据长度:', decodedStr.length);
+                } catch (decodeError) {
+                    console.error('Base64解码失败:', decodeError);
+                    showToast('分享码解码失败，可能已损坏');
+                    return;
+                }
+                
+                let shareData;
+                try {
+                    shareData = JSON.parse(decodedStr);
+                    console.log('JSON解析成功，数据结构:', Object.keys(shareData));
+                } catch (jsonError) {
+                    console.error('JSON解析失败:', jsonError);
+                    showToast('分享码数据格式错误');
+                    return;
+                }
                 
                 // 验证数据格式
-                if (!shareData.data || !shareData.timestamp) {
-                    throw new Error('分享码数据格式不正确');
+                if (!shareData.data) {
+                    console.log('错误：shareData中缺少data字段');
+                    showToast('分享码数据格式不完整：缺少健康数据');
+                    return;
                 }
                 
-                // 检查数据时效性（可选，这里设置7天有效期）
+                if (!shareData.timestamp) {
+                    console.log('警告：shareData中缺少timestamp字段');
+                    shareData.timestamp = Date.now(); // 设置默认时间戳
+                }
+                
+                console.log('健康数据天数:', Object.keys(shareData.data).length);
+                
+                // 检查数据时效性（7天）
                 const daysDiff = (Date.now() - shareData.timestamp) / (1000 * 60 * 60 * 24);
+                console.log('数据时效性检查，天数差:', daysDiff);
+                
+                let confirmMessage = `即将同步健康记录数据：\n\n`;
+                confirmMessage += `📅 数据生成时间: ${new Date(shareData.timestamp).toLocaleString()}\n`;
+                confirmMessage += `📊 记录天数: ${Object.keys(shareData.data).length} 天\n`;
+                confirmMessage += `🔄 数据版本: ${shareData.version || '1.0'}\n`;
+                
                 if (daysDiff > 7) {
-                    if (!confirm('此分享码已超过7天，数据可能较旧，确定要同步吗？')) {
-                        return;
-                    }
+                    confirmMessage += `\n⚠️ 注意：此数据已超过7天\n`;
                 }
                 
-                // 显示数据预览
-                const dataPreview = `
-                    数据生成时间: ${new Date(shareData.timestamp).toLocaleString()}
-                    记录天数: ${Object.keys(shareData.data).length} 天
-                    数据版本: ${shareData.version || '未知'}
-                `;
+                confirmMessage += `\n同步将完全覆盖当前所有数据，确定继续吗？`;
                 
-                if (confirm(`即将同步以下数据：\n\n${dataPreview}\n\n同步将覆盖当前所有数据，确定继续吗？`)) {
-                    healthData = shareData.data;
-                    saveData();
-                    showToast('数据同步成功！');
-                    updateDate();
-                    updateDataStats();
-                    hideSyncInput();
+                if (confirm(confirmMessage)) {
+                    console.log('用户确认同步，开始更新数据');
+                    
+                    // 备份当前数据（以防出错）
+                    const backupData = JSON.parse(JSON.stringify(healthData));
+                    console.log('已备份当前数据');
+                    
+                    try {
+                        healthData = shareData.data;
+                        saveData();
+                        console.log('数据同步成功');
+                        
+                        showToast('✅ 数据同步成功！');
+                        updateDate();
+                        updateDataStats();
+                        hideSyncInput();
+                        
+                        // 显示同步结果
+                        setTimeout(() => {
+                            const totalRecords = Object.keys(healthData).length;
+                            showToast(`同步完成：共${totalRecords}天记录`);
+                        }, 2000);
+                        
+                    } catch (saveError) {
+                        console.error('保存数据失败:', saveError);
+                        healthData = backupData; // 恢复备份
+                        showToast('保存失败，已恢复原数据');
+                    }
+                } else {
+                    console.log('用户取消同步');
                 }
                 
             } catch (error) {
-                console.error('同步失败:', error);
-                showToast('分享码格式错误或已损坏，请检查后重试');
+                console.error('同步过程发生未知错误:', error);
+                showToast(`同步失败：${error.message}`);
             }
+        }
+        
+        // 改进的生成分享码函数（增加调试信息）
+        function generateShareCode() {
+            try {
+                console.log('开始生成分享码');
+                console.log('当前健康数据天数:', Object.keys(healthData).length);
+                
+                // 添加时间戳和基本验证信息
+                const shareData = {
+                    data: healthData,
+                    timestamp: Date.now(),
+                    version: '1.0',
+                    deviceInfo: navigator.userAgent.slice(0, 50)
+                };
+                
+                console.log('准备编码的数据结构:', Object.keys(shareData));
+                
+                const dataStr = JSON.stringify(shareData);
+                console.log('JSON字符串长度:', dataStr.length);
+                
+                // 使用Base64编码
+                const encoded = btoa(unescape(encodeURIComponent(dataStr)));
+                console.log('Base64编码长度:', encoded.length);
+                
+                // 添加标识前缀
+                const shareCode = 'HEALTH_DATA_' + encoded;
+                console.log('最终分享码长度:', shareCode.length);
+                
+                document.getElementById('shareCodeText').value = shareCode;
+                document.getElementById('shareCodeResult').style.display = 'block';
+                document.getElementById('qrCodeResult').style.display = 'none';
+                
+                showToast('✅ 分享码生成成功！');
+                console.log('分享码生成完成');
+                
+            } catch (error) {
+                console.error('生成分享码失败:', error);
+                showToast(`生成失败：${error.message}`);
+            }
+        }
+        
+        // 测试函数（可以用来验证数据）
+        function testSync() {
+            console.log('=== 同步测试 ===');
+            console.log('当前健康数据:', healthData);
+            console.log('数据天数:', Object.keys(healthData).length);
+            
+            // 生成测试分享码
+            generateShareCode();
+            
+            // 获取生成的分享码
+            const testCode = document.getElementById('shareCodeText').value;
+            console.log('测试分享码长度:', testCode.length);
+            
+            // 模拟输入分享码
+            document.getElementById('inputShareCode').value = testCode;
+            console.log('已设置测试分享码到输入框');
+            
+            showToast('测试数据已准备，可以点击同步测试');
         }
         
         // 页面加载时初始化
